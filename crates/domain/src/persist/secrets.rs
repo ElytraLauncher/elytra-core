@@ -250,6 +250,7 @@ fn key_decrypt(key: &[u8; 32], data: &[u8]) -> Result<Vec<u8>, CoreError> {
 /// secrets.bin 每条 value 用主密钥 ChaCha20-Poly1305 加密；无 Secret Service / collection 未解锁时降级明文。
 #[cfg(target_os = "linux")]
 mod key_utils {
+    use crate::error::CoreError;
     use std::collections::HashMap;
     use std::sync::LazyLock;
 
@@ -374,6 +375,7 @@ mod key_utils {
 /// 主密钥 ChaCha20-Poly1305 加密。钥匙串不可用时降级明文。
 #[cfg(target_os = "macos")]
 mod keychain {
+    use crate::error::CoreError;
     use std::sync::LazyLock;
 
     use core_foundation::data::CFData;
@@ -381,7 +383,7 @@ mod keychain {
         ItemAddOptions, ItemAddValue, ItemClass, ItemSearchOptions, SearchResult,
     };
 
-    use crate::constants::{KEYCHAIN_MASTER_KEY_ACCOUNT, KEYCHAIN_SERVICE};
+    use crate::constants::{keychain_service, KEYCHAIN_MASTER_KEY_ACCOUNT};
 
     /// 主密钥懒加载（进程内缓存）；钥匙串不可用 → None（调用方降级明文）。
     static MASTER_KEY: LazyLock<Option<[u8; 32]>> = LazyLock::new(|| {
@@ -403,7 +405,7 @@ mod keychain {
     fn load_key() -> Result<Option<[u8; 32]>, CoreError> {
         let results = ItemSearchOptions::new()
             .class(ItemClass::generic_password())
-            .service(KEYCHAIN_SERVICE)
+            .service(keychain_service())
             .account(KEYCHAIN_MASTER_KEY_ACCOUNT)
             .load_data(true)
             .search()
@@ -425,14 +427,14 @@ mod keychain {
         // 幂等：先删后写（对齐 Linux create_item replace=true 语义）
         let _ = ItemSearchOptions::new()
             .class(ItemClass::generic_password())
-            .service(KEYCHAIN_SERVICE)
+            .service(keychain_service())
             .account(KEYCHAIN_MASTER_KEY_ACCOUNT)
             .delete();
         ItemAddOptions::new(ItemAddValue::Data {
             class: ItemClass::generic_password(),
             data: CFData::from_buffer(key),
         })
-        .set_service(KEYCHAIN_SERVICE)
+        .set_service(keychain_service())
         .set_account_name(KEYCHAIN_MASTER_KEY_ACCOUNT)
         .add()
         .map_err(common_err_ctx_key!(
