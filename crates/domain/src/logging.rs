@@ -9,7 +9,7 @@ use std::path::Path;
 /// launcher.log 单文件上限 5 MiB：超限则在启动时轮转为 `launcher.log.1`（仅保留一份备份）。
 const MAX_LOG_BYTES: u64 = 5 * 1024 * 1024;
 
-/// 安装 stderr logger；调用前先 `init_file_logging`，日志随 stderr 落入 launcher.log。
+/// 安装 stderr logger，并把 stdout/stderr 重定向到配置目录 `launcher.log`；进程内只调用一次。
 pub fn init() {
     init_file_logging();
     static LOGGER: StderrLogger = StderrLogger;
