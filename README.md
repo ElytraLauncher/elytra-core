@@ -15,6 +15,8 @@ Elytra Launcher 的非 Tauri 核心：下载器、版本装配、ModLoader、任
 ## 宿主接入
 
 ```rust
+// 安装带时间戳的 logger，并把 stdout/stderr 落到配置目录 launcher.log
+elytra_domain::logging::init();
 elytra_domain::host::init(elytra_domain::host::Config {
     identity: elytra_domain::host::Identity {
         app_version: "1.7.4".into(),
