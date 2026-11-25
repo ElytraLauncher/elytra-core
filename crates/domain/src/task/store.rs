@@ -74,7 +74,11 @@ pub struct InterruptedJob {
 }
 
 fn db_path() -> std::path::PathBuf {
-    config_dir().join("tasks.db")
+    let dir = config_dir();
+    if let Err(e) = std::fs::create_dir_all(&dir) {
+        log::warn!("[task-store] 创建配置目录失败: {e}");
+    }
+    dir.join("tasks.db")
 }
 
 /// 同步执行异步 DB 操作（复用 util::block_on；低频、阻塞毫秒级）；block_on 内不得再嵌套 block_on（tokio 禁止 runtime 内启动 runtime）。

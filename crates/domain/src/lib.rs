@@ -12,6 +12,7 @@ pub mod events;
 pub mod game;
 pub mod jdk;
 pub mod launcher;
+pub mod logging;
 pub mod persist;
 pub mod server_status;
 pub mod task;

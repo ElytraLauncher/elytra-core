@@ -1601,10 +1601,11 @@ dependencies = [
 
 [[package]]
 name = "elytra-domain"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "base64 0.22.1",
  "chacha20poly1305 0.11.0",
+ "chrono",
  "core-foundation 0.10.1",
  "flate2",
  "futures-util",
@@ -1634,7 +1635,7 @@ dependencies = [
 
 [[package]]
 name = "elytra-dto"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "elytra-domain",
  "elytra-map",
@@ -1647,7 +1648,7 @@ dependencies = [
 
 [[package]]
 name = "elytra-map"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "elytra-domain",
  "fastanvil",
@@ -1666,7 +1667,7 @@ dependencies = [
 
 [[package]]
 name = "elytra-online"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "easytier",
  "easytier-core",
@@ -1682,7 +1683,7 @@ dependencies = [
 
 [[package]]
 name = "elytra-seedmap"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "cc",
  "elytra-domain",

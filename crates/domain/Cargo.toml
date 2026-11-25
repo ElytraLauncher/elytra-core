@@ -7,6 +7,7 @@ publish.workspace = true
 
 [dependencies]
 log = "0.4"
+chrono = { version = "0.4", default-features = false, features = ["clock"] }
 serde = { version = "1", features = ["derive"] }
 toml = "0.8"
 reqwest = { version = "0.13.4", features = ["json", "stream", "gzip", "http2", "multipart"] }
