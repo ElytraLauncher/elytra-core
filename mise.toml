@@ -1,0 +1,5 @@
+[tools]
+rust = "1.99"
+protoc = "36"
+# EasyTier（online crate）构建依赖系统 7z 与 libclang；cubiomes（seedmap crate）在 Windows MSVC 需要 clang-cl。
+# 仅构建 elytra-domain 时不需要这些系统工具。

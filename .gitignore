@@ -1,0 +1,8 @@
+# Rust
+/target
+
+# 本地密钥（仅 app 需要，core 不读取）
+.env
+
+# ts-rs 独立测试输出
+bindings/

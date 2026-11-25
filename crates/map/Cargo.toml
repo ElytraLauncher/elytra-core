@@ -1,0 +1,23 @@
+[package]
+name = "elytra-map"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+elytra-domain = { path = "../domain" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+parking_lot = "0.12"
+zip = { version = "2", default-features = false, features = ["deflate", "bzip2", "aes-crypto", "time"] }
+flate2 = "1"
+mca = { version = "2.1", default-features = false }
+fastnbt = "2.6"
+fastanvil = "0.32"
+png = "0.18"
+image = { version = "0.23", default-features = false, features = ["png"] }
+lz4-java-wrc = "0.2"
+
+[dev-dependencies]
+tempfile = "3"

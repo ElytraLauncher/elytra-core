@@ -1,0 +1,2 @@
+# rustfmt 配置（workspace 根）
+max_width = 100

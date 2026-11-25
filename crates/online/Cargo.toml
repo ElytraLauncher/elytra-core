@@ -1,0 +1,18 @@
+[package]
+name = "elytra-online"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+log = "0.4"
+elytra-domain = { path = "../domain" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+getrandom = "0.2"
+tokio = { version = "1", features = ["full"] }
+parking_lot = "0.12"
+easytier = { git = "https://github.com/EasyTier/EasyTier", default-features = false, features = ["management", "socks5", "smoltcp", "kcp", "quic", "websocket", "logging", "aes-gcm", "endpoint-discovery"] }
+easytier-core = { git = "https://github.com/EasyTier/EasyTier", default-features = false }
+rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }

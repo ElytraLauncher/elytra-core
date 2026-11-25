@@ -1,0 +1,98 @@
+//! 任务注册与 spawn：把执行闭包挂到 TaskManager 并落 running 快照。
+
+use crate::error::CoreError;
+use parking_lot::Mutex;
+use std::sync::atomic::AtomicBool;
+use std::sync::Arc;
+
+use super::manager::global;
+use super::model::{DownloadTask, StepKind, TaskProgress, TaskStatus, TaskText};
+use super::steps::{StepSpec, TaskSpec};
+use super::store;
+use super::{jdk, runner};
+use crate::config::downloader::DownloaderConfig;
+use crate::downloader;
+use crate::jdk::SUPPORTED_JAVA_MAJORS;
+use crate::persist;
+use crate::task::EventSink;
+use crate::util::spawn;
+
+/// 注册任务并 spawn 执行：事件出口由调用方注入（生产走宿主 sink，测试注入记录型 sink）。
+pub fn spawn_task_with_sink(
+    sink: Arc<dyn EventSink>,
+    name: String,
+    text: TaskText,
+    steps: Vec<StepSpec>,
+    spec: store::JobSpec,
+    run: impl FnOnce(Arc<dyn EventSink>, Arc<AtomicBool>, Arc<Mutex<TaskProgress>>) + Send + 'static,
+) -> Result<String, CoreError> {
+    let tm = global();
+    // 每次任务启动同步全局限速（用户改配置后不重启也生效）
+    let cfg: DownloaderConfig = persist::downloader_config();
+    downloader::fetcher::set_speed_limit(cfg.max_speed);
+    let (task_id, cancel, progress) = tm.create(&name, &text, &steps);
+    // 持久化快照（崩溃/重启恢复依据；DB 故障静默）
+    store::save_snapshot(&task_id, &name, &spec, TaskStatus::Running);
+    run(sink, cancel, progress);
+    Ok(task_id)
+}
+
+/// 完整下载/安装任务：校验 → 注册 → spawn（编排在 task/runner.rs）。
+pub fn spawn_download(sink: Arc<dyn EventSink>, task: DownloadTask) -> Result<String, CoreError> {
+    task.validate()?;
+    let text = match &task.loader {
+        Some(loader) => TaskText::new(
+            "task.backend.name.install",
+            &[
+                ("mc", task.mc_version.clone()),
+                ("loader", loader.kind.display_name().to_string()),
+                ("version", loader.version.clone()),
+            ],
+        ),
+        None if task.optifine_patch.is_some() => TaskText::new(
+            "task.backend.name.optifine",
+            &[("mc", task.version_id.clone())],
+        ),
+        None => TaskText::new(
+            "task.backend.name.download",
+            &[("mc", task.version_id.clone())],
+        ),
+    };
+    spawn_task_with_sink(
+        sink,
+        task.name(),
+        text,
+        task.steps(),
+        store::JobSpec::Download(task.clone()),
+        move |a, cancel, progress| {
+            spawn(async move {
+                runner::run_task(a, &cancel, &progress, &task).await;
+            });
+        },
+    )
+}
+
+/// JDK 安装任务：支持列表校验 → 单步注册 → spawn（执行体在 task/jdk.rs）。
+pub fn spawn_install_jdk(sink: Arc<dyn EventSink>, major: u32) -> Result<String, CoreError> {
+    if !SUPPORTED_JAVA_MAJORS.contains(&major) {
+        bail_key!(
+            "errors.jdk.install",
+            "暂不支持安装 Java {major}（仅支持 8/17/21/25）"
+        );
+    }
+    spawn_task_with_sink(
+        sink,
+        format!("下载 Java {major}"),
+        TaskText::new("task.backend.name.jdk", &[("major", major.to_string())]),
+        vec![StepSpec {
+            name: "下载 Java 运行时".into(),
+            kind: StepKind::JavaRuntime,
+        }],
+        store::JobSpec::InstallJdk { major },
+        move |a, cancel, progress| {
+            spawn(async move {
+                jdk::run_install_jdk(a, &cancel, &progress, major).await;
+            });
+        },
+    )
+}
