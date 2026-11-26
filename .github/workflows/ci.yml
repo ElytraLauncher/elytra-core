@@ -1,0 +1,77 @@
+name: CI
+
+# core 自身的质量门：应用仓库通过 git tag 依赖本仓库，不再 clone sibling 跑这些检查。
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  linux:
+    name: Rust（Linux fmt/clippy/test）
+    runs-on: ubuntu-22.04
+    timeout-minutes: 60
+    env:
+      MISE_RUSTUP_HOME: /home/runner/.local/share/mise/rustup
+    steps:
+      - uses: actions/checkout@v5
+      - uses: jdx/mise-action@v5
+        with:
+          install_args: "rust protoc"
+      - name: 系统依赖（EasyTier / cubiomes）
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libclang-dev p7zip-full
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: .
+      - name: cargo fmt
+        run: cargo fmt --all --check
+      - name: cargo clippy
+        run: cargo clippy --workspace -- -D warnings
+      - name: cargo test（串行，lib）
+        run: cargo test --workspace --lib -- --test-threads=1
+      - name: DTO 契约漂移
+        run: cargo test -p elytra-dto --test shape
+      - name: 工具箱下载器集成
+        run: cargo test -p elytra-domain --test tool_download
+
+  windows:
+    name: Rust（Windows clippy/test）
+    runs-on: windows-latest
+    timeout-minutes: 60
+    env:
+      LIBCLANG_PATH: C:\Program Files\LLVM\bin
+      MISE_RUSTUP_HOME: C:\Users\runneradmin\AppData\Local\mise\rustup
+    steps:
+      - uses: actions/checkout@v5
+      - uses: jdx/mise-action@v5
+        with:
+          install_args: "rust protoc"
+      - name: 确保 7-Zip 可用（EasyTier 构建依赖）
+        shell: bash
+        run: |
+          if [ -f "/c/Program Files/7-Zip/7z.exe" ]; then
+            echo "C:/Program Files/7-Zip" >> "$GITHUB_PATH"
+          else
+            choco install 7zip -y
+            echo "C:/Program Files/7-Zip" >> "$GITHUB_PATH"
+          fi
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: .
+      - name: cargo clippy
+        run: cargo clippy --workspace -- -D warnings
+      - name: cargo test（串行，lib）
+        run: cargo test --workspace --lib -- --test-threads=1
+      - name: DTO 契约漂移
+        run: cargo test -p elytra-dto --test shape
+      - name: 工具箱下载器集成
+        run: cargo test -p elytra-domain --test tool_download
