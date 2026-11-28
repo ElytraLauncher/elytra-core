@@ -42,7 +42,7 @@ fn world_gen_files(world_root: &Path) -> [PathBuf; 2] {
     ]
 }
 
-fn read_nbt(path: &Path) -> Option<std::collections::HashMap<String, Value>> {
+pub(crate) fn read_nbt(path: &Path) -> Option<std::collections::HashMap<String, Value>> {
     let bytes = std::fs::read(path).ok()?;
     let mut out = Vec::new();
     flate2::read::GzDecoder::new(&bytes[..])
