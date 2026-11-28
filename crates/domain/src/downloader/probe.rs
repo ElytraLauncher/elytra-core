@@ -191,6 +191,9 @@ async fn probe_speed_uncached(url: &str) -> SpeedProbeResult {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::sync::Arc;
+    use tokio::io::{AsyncReadExt as _, AsyncWriteExt as _};
 
     #[test]
     fn probe_cache_roundtrip() {
@@ -204,6 +207,36 @@ mod tests {
         assert_eq!(cache_get(probe_cache(), url), Some(res));
         assert_eq!(cache_get(probe_cache(), url).unwrap().ttfb_ms, 42);
         probe_cache().lock().remove(url);
+    }
+
+    #[tokio::test]
+    async fn probe_domain_reuses_cache_across_paths() {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        let hits = Arc::new(AtomicUsize::new(0));
+        let server_hits = Arc::clone(&hits);
+        tokio::spawn(async move {
+            let Ok((mut socket, _)) = listener.accept().await else {
+                return;
+            };
+            server_hits.fetch_add(1, Ordering::Relaxed);
+            let mut buf = [0u8; 1024];
+            let _ = socket.read(&mut buf).await;
+            let _ = socket
+                .write_all(b"HTTP/1.1 200 OK\r\nContent-Length: 0\r\nConnection: close\r\n\r\n")
+                .await;
+        });
+
+        let a = format!("http://{addr}/a");
+        let b = format!("http://{addr}/b");
+        let first = probe_domain(&a).await;
+        let second = probe_domain(&b).await;
+        assert!(first.ok && second.ok, "本地 HEAD 应成功");
+        assert_eq!(
+            hits.load(Ordering::Relaxed),
+            1,
+            "同域不同路径应复用域级探测缓存"
+        );
     }
 
     #[test]

@@ -5,7 +5,8 @@ use crate::downloader;
 use crate::persist;
 
 /// 社区文件下载候选：Modrinth 官方 CDN → MCIM 换域名镜像。按 community_source_mode：OfficialOnly
-/// 仅官方 / MirrorOnly 仅镜像 / Auto 探测两源 TTFB（TTL 10min）快者优先、慢者兜底；非 modrinth CDN 仅官方一源。
+/// 仅官方 / MirrorOnly 仅镜像 / Auto 域级 TTFB（TTL 10min，同域文件共享缓存）快者优先、慢者兜底；
+/// 非 modrinth CDN 仅官方一源。
 pub async fn community_download_urls(url: &str) -> Vec<String> {
     let official = url.to_string();
     let mirrored = official.replace(
@@ -20,8 +21,9 @@ pub async fn community_download_urls(url: &str) -> Vec<String> {
         DownloadSourceMode::OfficialOnly => vec![official],
         DownloadSourceMode::MirrorOnly => vec![mirrored],
         DownloadSourceMode::Auto => {
-            let o = downloader::probe::probe_url(&official).await;
-            let m = downloader::probe::probe_url(&mirrored).await;
+            // 按域缓存：大整合包里每个 Mod 都是新 URL，逐 URL 探测会为每个文件额外打两次 HEAD。
+            let o = downloader::probe::probe_domain(&official).await;
+            let m = downloader::probe::probe_domain(&mirrored).await;
             if prefer_mirror(m.ok, m.ttfb_ms, o.ttfb_ms) {
                 vec![mirrored, official]
             } else {

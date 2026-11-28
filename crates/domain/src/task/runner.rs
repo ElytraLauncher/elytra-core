@@ -751,12 +751,18 @@ pub async fn run_task(
     );
 
     log::warn!(
+        "[task] 阶段C: 客户端 jar 优先 ({:.1}s)",
+        t0.elapsed().as_secs_f64()
+    );
+    // 客户端 jar 先下完再启动资源批处理：慢网下 64 路资源会抢走带宽，加载器等 client jar 120s 无进度
+    // 即判 `vanillaClientTimeout`（见 loader/forge.rs），整条安装失败；jar 完成后加载器不会空等。
+    let jar = download_client_jar(&ctx).await;
+    log::warn!(
         "[task] 阶段C: 并行下载开始 ({:.1}s)",
         t0.elapsed().as_secs_f64()
     );
     // 用 join! 而非 try_join!：后者短路后各 step 内部 spawn 的批处理 worker 仍在写盘，与失败整删目录竞争（Windows 句柄占用令删除失败/目录重建）；须等全部收尾再收口。
-    let (jar, libs, assets, natives, loader_r, optifine_r, fabric_r) = tokio::join!(
-        download_client_jar(&ctx),
+    let (libs, assets, natives, loader_r, optifine_r, fabric_r) = tokio::join!(
         download_libraries_step(&ctx),
         download_assets_step(&ctx),
         extract_natives_step(&ctx),
